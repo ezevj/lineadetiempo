@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Línea de Tiempo del Cosmos</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+
+    <style>
+        :root {
+            --text-color: rgba(255, 255, 255, 0.95);
+            --primary-glow: #ffcc80;
+        }
+
+        body {
+            margin: 0;
+            background-color: #000;
+            font-family: 'Inter', sans-serif;
+            color: var(--text-color);
+        }
+
+        #scroll-helper {
+            height: 800vh; 
+        }
+
+        .scene {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none; /* Novedad: Inactivo por defecto */
+        }
+
+        .scene.active {
+            pointer-events: auto; /* Novedad: Activo cuando es visible */
+        }
+
+        #big-bang { z-index: 8; }
+        #plasma-soup { z-index: 7; opacity: 0; }
+        #first-light { z-index: 6; opacity: 0; }
+        #dark-ages { z-index: 5; opacity: 0; }
+        #first-galaxies { z-index: 4; opacity: 0; }
+        #solar-system { z-index: 3; opacity: 0; }
+        #modern-universe { z-index: 2; opacity: 0; }
+        #conclusion { z-index: 1; opacity: 0; }
+
+        /* --- Estilos de Escenas (con capas para parallax) --- */
+        .parallax-bg { position: absolute; width: 100%; height: 100%; top: 0; left: 0; }
+        .parallax-fg { position: absolute; width: 100%; height: 100%; top: 0; left: 0; display: flex; justify-content: center; align-items: center; }
+
+        #big-bang::before { content: ''; position: absolute; width: 100%; height: 100%; background: radial-gradient(ellipse at center, rgba(255,255,255,0.8) 0%, rgba(255,255,220,0.3) 30%, rgba(0,0,0,0) 70%); transform: scale(0); opacity: 0; animation: expand-glow 4s cubic-bezier(0.165, 0.84, 0.44, 1) forwards; }
+        .light-point { width: 20px; height: 20px; background-color: white; border-radius: 50%; box-shadow: 0 0 20px 10px white, 0 0 50px 30px #ffeeaa, 0 0 120px 80px var(--primary-glow); transform: scale(0); z-index: 10; animation: expand-point 3s cubic-bezier(0.165, 0.84, 0.44, 1) forwards, pulse 4s ease-in-out infinite 3s; }
+        
+        #plasma-soup .background { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: #0d021a; }
+        .plasma-layer { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-size: 400% 400%; mix-blend-mode: screen; opacity: 0.7; }
+        .plasma-layer-1 { background: radial-gradient(circle at 20% 20%, #ff4e00, transparent 50%), radial-gradient(circle at 80% 70%, #d11d53, transparent 50%); animation: plasma-flow-1 30s ease-in-out infinite alternate; }
+        .plasma-layer-2 { background: radial-gradient(circle at 50% 80%, #5e085b, transparent 40%), radial-gradient(circle at 10% 10%, #3d1a63, transparent 60%); animation: plasma-flow-2 45s linear infinite alternate-reverse; opacity: 0.5; }
+        
+        #first-light .background { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: #01020a; }
+        .cmb-layer { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-size: 100% 100%; mix-blend-mode: color-dodge; opacity: 0; animation: cmb-glow 25s ease-in-out infinite alternate; }
+        .cmb-layer-1 { background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.02 0.05" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23n)" opacity="0.4"/></svg>'); opacity: 0.4; }
+        .cmb-layer-2 { background: radial-gradient(circle at 30% 40%, rgba(255, 180, 100, 0.4) 0%, transparent 30%), radial-gradient(circle at 70% 60%, rgba(100, 180, 255, 0.4) 0%, transparent 35%); animation-delay: -12s; }
+        
+        #dark-ages { background-color: #000; }
+        .starfield { position: absolute; top:0; left:0; width:100%; height:100%; }
+        .star { position: absolute; background-color: #aaccff; border-radius: 50%; }
+        .first-star { width: 15px; height: 15px; box-shadow: 0 0 15px 5px #aaccff, 0 0 40px 15px #5588ff, 0 0 100px 40px rgba(85, 136, 255, 0.5); transform: scale(0); opacity: 0; }
+        .secondary-star { box-shadow: 0 0 5px 1px #aaccff, 0 0 10px 3px #5588ff; opacity: 0; }
+        
+        #first-galaxies { background-color: #000; }
+        .galaxy-container { width: 80vmin; height: 80vmin; position: relative; animation: galaxy-rotate 180s linear infinite; }
+        .nebula { position: absolute; border-radius: 50%; mix-blend-mode: screen; animation: nebula-flicker 20s ease-in-out infinite alternate; }
+        .nebula-1 { top: 0; left: 10%; width: 60%; height: 60%; background: radial-gradient(circle, rgba(224, 80, 150, 0.4) 0%, transparent 70%); animation-delay: -5s; }
+        .nebula-2 { bottom: 5%; right: 0; width: 70%; height: 70%; background: radial-gradient(circle, rgba(144, 90, 255, 0.3) 0%, transparent 70%); animation-delay: -12s; }
+        .galaxy-stars { position: absolute; top:0; left:0; width:100%; height:100%; }
+        .galaxy-star { position: absolute; background-color: #fff; border-radius: 50%; box-shadow: 0 0 8px 2px #c1d5ff; }
+        
+        #solar-system { background-color: #000; }
+        .protoplanetary-disk { width: 100vmin; height: 100vmin; position: relative; animation: galaxy-rotate-slow 200s linear infinite; }
+        .young-sun { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 10%; height: 10%; background: radial-gradient(ellipse, #ffffff 0%, #ffeeaa 60%, rgba(255, 204, 128, 0.3) 100%); border-radius: 50%; box-shadow: 0 0 60px 20px var(--primary-glow), inset 0 0 20px 5px #fff; }
+        .dust-disk { position: absolute; top: 50%; left: 50%; width: 100%; height: 100%; transform: translate(-50%, -50%) perspective(400px) rotateX(75deg); background: radial-gradient(ellipse, transparent 20%, rgba(255, 204, 128, 0.2) 30%, rgba(150, 100, 80, 0.15) 60%, transparent 80%); border-radius: 50%; }
+        .disk-particle { position: absolute; width: 2px; height: 2px; background-color: #fff; border-radius: 50%; box-shadow: 0 0 8px 2px #ffebc1; animation: particle-flicker 3s infinite alternate; }
+
+        #modern-universe { background-color: #000; }
+        .spiral-galaxy { width: 80vmin; height: 80vmin; position: relative; animation: galaxy-rotate-slow 360s linear infinite; }
+        .galaxy-core { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 20%; height: 20%; background: radial-gradient(ellipse, #fff8e1 10%, #ffebbc 40%, rgba(255, 204, 128, 0.05) 80%, transparent 100%); border-radius: 50%; box-shadow: 0 0 50px 15px rgba(255, 224, 178, 0.7); }
+        .spiral-arm { position: absolute; top:0; left:0; width:100%; height:100%; border-radius: 50%; }
+        .arm-stars { position: absolute; width: 100%; height: 100%; background: radial-gradient(ellipse at 70% 50%, rgba(159, 192, 255, 0.2) 0%, transparent 30%); border-radius: 50%; }
+        .arm-1 { transform: rotate(45deg); }
+        .arm-2 { transform: rotate(225deg); }
+        .dust-lane { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 50%; box-shadow: inset 50px -20px 40px -10px rgba(0,0,0,0.5); transform: rotate(-30deg); }
+
+        #conclusion { background: linear-gradient(to top, #010a1a 0%, #000000 40%); }
+        .shooting-star { position: absolute; height: 2px; background: linear-gradient(-45deg, #fff, rgba(255, 255, 255, 0)); border-radius: 999px; filter: drop-shadow(0 0 6px #fff); }
+
+        /* --- UI Elements --- */
+        .info-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 90%; max-width: 500px; color: var(--text-color); padding: 20px; z-index: 20; text-align: center; text-shadow: 0 0 8px rgba(0,0,0,0.7); opacity: 0; }
+        #big-bang .info-overlay.visible { animation: fadeIn 2s ease-out 3.5s forwards; }
+        .timeline-time { font-weight: 300; font-size: 1em; margin: 0; opacity: 0.8; }
+        .timeline-title { font-weight: 700; font-size: 2.5em; margin: 5px 0; text-shadow: 0 0 15px rgba(255, 255, 255, 0.4); }
+        .timeline-description { font-weight: 400; font-size: 1.1em; line-height: 1.6; margin: 10px 0 0 0; }
+        .credits { margin-top: 40px; font-size: 0.9em; font-weight: 300; opacity: 0.7; }
+        
+        .more-info-btn { background-color: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: var(--text-color); padding: 8px 16px; margin-top: 20px; border-radius: 20px; cursor: pointer; transition: all 0.2s ease; }
+        .more-info-btn:hover { background-color: rgba(255,255,255,0.2); border-color: var(--primary-glow); }
+
+        #timeline-nav { position: fixed; top: 50%; right: 20px; transform: translateY(-50%); z-index: 100; display: flex; flex-direction: column; gap: 15px; }
+        .nav-dot { width: 12px; height: 12px; background-color: rgba(255,255,255,0.3); border-radius: 50%; cursor: pointer; transition: all 0.3s ease; border: 2px solid transparent; }
+        .nav-dot.active { background-color: var(--text-color); border-color: var(--primary-glow); transform: scale(1.2); }
+
+        #nav-arrows { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 100; display: flex; gap: 20px; }
+        .arrow { font-size: 2em; cursor: pointer; transition: opacity 0.3s ease; user-select: none; }
+        .arrow:hover { opacity: 0.7; }
+        .arrow.disabled { opacity: 0.2; cursor: not-allowed; }
+
+        #modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8); z-index: 200; display: flex; justify-content: center; align-items: center; opacity: 0; visibility: hidden; transition: all 0.3s ease; }
+        #modal.visible { opacity: 1; visibility: visible; }
+        .modal-content { background-color: #111; padding: 30px; border-radius: 10px; max-width: 600px; width: 90%; position: relative; border: 1px solid rgba(255,255,255,0.2); }
+        .modal-close { position: absolute; top: 10px; right: 15px; font-size: 1.5em; cursor: pointer; }
+
+        #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #000; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: opacity 0.5s ease; }
+        #loader p { font-size: 1.2em; }
+        #loader button { background-color: var(--primary-glow); color: #000; border: none; padding: 12px 24px; font-size: 1em; border-radius: 30px; cursor: pointer; }
+
+        /* Keyframes */
+        @keyframes expand-glow { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes expand-point { from { transform: scale(0); } to { transform: scale(1); } }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translate(-50%, calc(-50% + 20px)); } to { opacity: 1; transform: translate(-50%, -50%); } }
+        @keyframes plasma-flow-1 { from { transform: translateX(-10%) translateY(5%) rotate(0deg); } to { transform: translateX(10%) translateY(-5%) rotate(30deg); } }
+        @keyframes plasma-flow-2 { from { transform: translateX(5%) translateY(-10%) rotate(0deg); } to { transform: translateX(-5%) translateY(10%) rotate(-25deg); } }
+        @keyframes cmb-glow { from { opacity: 0.3; transform: scale(1); } to { opacity: 0.6; transform: scale(1.02); } }
+        @keyframes galaxy-rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes nebula-flicker { from { opacity: 0.5; transform: scale(1); } to { opacity: 0.8; transform: scale(1.05); } }
+        @keyframes drift { from { transform: translate(0, 0) rotate(0deg); opacity: 0.1; } 25% { opacity: 0.4; } 50% { transform: translate(-20px, 15px) rotate(10deg); opacity: 0.2; } 75% { opacity: 0.5; } to { transform: translate(0, 0) rotate(0deg); opacity: 0.1; } }
+        @keyframes galaxy-rotate-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes particle-flicker { from { opacity: 0.2; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+    <div id="loader">
+        <p>La historia del universo está a punto de comenzar.</p>
+        <button id="start-btn">Iniciar Experiencia</button>
+    </div>
+
+    <div id="scroll-helper"></div>
+
+    <div id="timeline-nav"></div>
+    <div id="nav-arrows">
+        <div class="arrow" id="arrow-up">▲</div>
+        <div class="arrow" id="arrow-down">▼</div>
+    </div>
+
+    <div id="modal">
+        <div class="modal-content">
+            <span class="modal-close">&times;</span>
+            <h2 id="modal-title"></h2>
+            <p id="modal-text"></p>
+        </div>
+    </div>
+
+    <!-- Escenas -->
+    <section class="scene" id="big-bang">
+        <div class="parallax-bg"></div>
+        <div class="parallax-fg">
+            <div class="light-point"></div>
+        </div>
+        <div class="info-overlay">
+            <h2 class="timeline-time">Tiempo: 0 segundos</h2>
+            <h1 class="timeline-title">El Big Bang</h1>
+            <p class="timeline-description">El universo comienza a expandirse desde un punto de densidad y temperatura infinitas, dando origen al espacio, el tiempo y toda la materia y energía que conocemos.</p>
+            <button class="more-info-btn" data-scene="0">Saber más</button>
+        </div>
+    </section>
+
+    <section class="scene" id="plasma-soup">
+        <div class="parallax-bg">
+            <div class="background">
+                <div class="plasma-layer plasma-layer-1"></div>
+                <div class="plasma-layer plasma-layer-2"></div>
+            </div>
+        </div>
+        <div class="info-overlay">
+            <h2 class="timeline-time">Tiempo: ~1 microsegundo</h2>
+            <h1 class="timeline-title">Sopa de Plasma e Inflación</h1>
+            <p class="timeline-description">El universo es una sopa hirviente y opaca de partículas fundamentales. La energía es tan alta que la luz no puede viajar libremente, creando un caos de color y movimiento.</p>
+            <button class="more-info-btn" data-scene="1">Saber más</button>
+        </div>
+    </section>
+
+    <section class="scene" id="first-light">
+        <div class="parallax-bg">
+            <div class="background">
+                <div class="cmb-layer cmb-layer-1"></div>
+                <div class="cmb-layer cmb-layer-2"></div>
+            </div>
+        </div>
+        <div class="info-overlay">
+            <h2 class="timeline-time">Tiempo: ~380,000 años</h2>
+            <h1 class="timeline-title">La Primera Luz</h1>
+            <p class="timeline-description">El universo se enfría y se vuelve transparente. La luz puede viajar libremente por primera vez, y su resplandor fósil, el Fondo Cósmico de Microondas, llena todo el espacio.</p>
+            <button class="more-info-btn" data-scene="2">Saber más</button>
+        </div>
+    </section>
+
+    <section class="scene" id="dark-ages">
+        <div class="parallax-bg starfield"></div>
+        <div class="parallax-fg">
+            <div class="star first-star"></div>
+        </div>
+        <div class="info-overlay">
+            <h2 class="timeline-time">Tiempo: ~400 millones de años</h2>
+            <h1 class="timeline-title">La Edad Oscura y las Primeras Estrellas</h1>
+            <p class="timeline-description">Tras eones de oscuridad, la gravedad comienza a formar las primeras estrellas. Estas estrellas masivas y azules encienden el cosmos, poniendo fin a la edad oscura.</p>
+            <button class="more-info-btn" data-scene="3">Saber más</button>
+        </div>
+    </section>
+
+    <section class="scene" id="first-galaxies">
+        <div class="parallax-bg distant-galaxies"></div>
+        <div class="parallax-fg">
+            <div class="galaxy-container">
+                <div class="nebula nebula-1"></div>
+                <div class="nebula nebula-2"></div>
+                <div class="galaxy-stars"></div>
+            </div>
+        </div>
+        <div class="info-overlay">
+            <h2 class="timeline-time">Tiempo: ~1 mil millones de años</h2>
+            <h1 class="timeline-title">Formación de las Primeras Galaxias</h1>
+            <p class="timeline-description">La gravedad une cúmulos de estrellas y gas, formando las primeras protogalaxias. Son estructuras caóticas, irregulares y llenas de vibrantes regiones de formación estelar.</p>
+            <button class="more-info-btn" data-scene="4">Saber más</button>
+        </div>
+    </section>
+
+    <section class="scene" id="solar-system">
+        <div class="parallax-bg starfield"></div>
+        <div class="parallax-fg">
+            <div class="protoplanetary-disk">
+                <div class="young-sun"></div>
+                <div class="dust-disk"></div>
+                <div class="galaxy-stars"></div>
+            </div>
+        </div>
+        <div class="info-overlay">
+            <h2 class="timeline-time">Tiempo: ~9 mil millones de años</h2>
+            <h1 class="timeline-title">Nacimiento del Sistema Solar</h1>
+            <p class="timeline-description">En un brazo de una galaxia espiral, una nube de gas y polvo colapsa para formar una nueva estrella: el Sol. El material restante forma un disco a su alrededor, donde nacerán los planetas.</p>
+            <button class="more-info-btn" data-scene="5">Saber más</button>
+        </div>
+    </section>
+
+    <section class="scene" id="modern-universe">
+        <div class="parallax-bg distant-galaxies"></div>
+        <div class="parallax-fg">
+            <div class="spiral-galaxy">
+                <div class="galaxy-core"></div>
+                <div class="spiral-arm arm-1"><div class="arm-stars"></div><div class="dust-lane"></div></div>
+                <div class="spiral-arm arm-2"><div class="arm-stars"></div><div class="dust-lane"></div></div>
+                <div class="galaxy-stars"></div>
+            </div>
+        </div>
+         <div class="info-overlay">
+            <h2 class="timeline-time">Tiempo: ~13.8 mil millones de años</h2>
+            <h1 class="timeline-title">El Universo Moderno</h1>
+            <p class="timeline-description">Las galaxias maduran en majestuosas espirales. En uno de sus brazos, en un sistema solar ordinario, la vida emerge y una civilización comienza a mirar hacia las estrellas, preguntándose sobre su origen.</p>
+            <button class="more-info-btn" data-scene="6">Saber más</button>
+        </div>
+    </section>
+
+    <section class="scene" id="conclusion">
+        <div class="parallax-bg starfield"></div>
+        <div class="parallax-fg"></div>
+        <div class="info-overlay">
+            <h1 class="timeline-title">Nuestro Lugar en el Cosmos</h1>
+            <p class="timeline-description">Desde un punto de luz hasta la inmensidad de las galaxias, cada átomo en nosotros es un eco de esta gran historia. Somos la forma en que el universo se contempla a sí mismo. El viaje apenas comienza.</p>
+            <p class="credits">Hecho por: Ezequiel Velasquez Jeandet</p>
+        </div>
+    </section>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const scenes = Array.from(document.querySelectorAll('.scene'));
+        const infos = Array.from(document.querySelectorAll('.info-overlay'));
+        const lightPoint = document.querySelector('#big-bang .light-point');
+        const firstStar = document.querySelector('#dark-ages .first-star');
+        const darkAgesStarfield = document.querySelector('#dark-ages .starfield');
+        const conclusionStarfield = document.querySelector('#conclusion .starfield');
+        const timelineNav = document.getElementById('timeline-nav');
+        const arrowUp = document.getElementById('arrow-up');
+        const arrowDown = document.getElementById('arrow-down');
+        const modal = document.getElementById('modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalText = document.getElementById('modal-text');
+        const modalClose = document.querySelector('.modal-close');
+        const loader = document.getElementById('loader');
+        const startBtn = document.getElementById('start-btn');
+
+        let currentSceneIndex = 0;
+        let audioStarted = false;
+        let sounds = {};
+
+        const modalData = [
+            { title: "La Singularidad", text: "Antes del Big Bang, se teoriza que todo el universo estaba contenido en un punto de densidad y calor infinitos llamado singularidad. Las leyes de la física como las conocemos no se aplicaban en este estado extremo." },
+            { title: "El Universo Opaco", text: "Durante sus primeros 380,000 años, el universo era tan denso y caliente que los fotones (partículas de luz) no podían viajar libremente sin chocar con electrones. Esto lo hacía completamente opaco, como una niebla impenetrable." },
+            { title: "El Eco del Big Bang", text: "El Fondo Cósmico de Microondas (CMB) es la luz más antigua que podemos observar. Es una 'foto' del universo cuando se volvió transparente. Las pequeñas variaciones de temperatura en el CMB (los colores azul y naranja) fueron las semillas de todas las estructuras futuras, como las galaxias." },
+            { title: "Estrellas de Población III", text: "Las primeras estrellas, conocidas como estrellas de Población III, eran enormes, cientos de veces más masivas que nuestro Sol. Estaban compuestas únicamente de hidrógeno y helio, los elementos forjados en el Big Bang. Vivieron vidas muy cortas y violentas, explotando como supernovas y sembrando el universo con los primeros elementos pesados." },
+            { title: "Fusión Galáctica", text: "Las primeras galaxias no eran las espirales majestuosas que vemos hoy. Eran cúmulos pequeños e irregulares que crecieron a lo largo de miles de millones de años a través de colisiones y fusiones violentas con otras protogalaxias." },
+            { title: "Un Disco de Creación", text: "El disco protoplanetario que rodeaba al joven Sol no era liso. Contenía granos de polvo y hielo que, por la gravedad, comenzaron a agruparse. Estos grupos formaron cuerpos cada vez más grandes llamados planetesimales, que eventualmente se convirtieron en los planetas, lunas y asteroides que conocemos." },
+            { title: "La Vía Láctea", text: "Nuestra galaxia, la Vía Láctea, es una galaxia espiral barrada que contiene entre 100 y 400 mil millones de estrellas. Nuestro sistema solar se encuentra en uno de sus brazos menores, el Brazo de Orión, a unos 27,000 años luz del centro galáctico." },
+        ];
+
+        // --- Inicialización ---
+        function init() {
+            createNavDots();
+            createStars();
+            setupEventListeners();
+            updateNav();
+            scenes.forEach((s, i) => {
+                s.style.opacity = i === 0 ? '1' : '0';
+                s.classList.toggle('active', i === 0);
+            });
+            infos.forEach((info) => { if (info) info.style.opacity = '0'; });
+        }
+
+        function createNavDots() {
+            scenes.forEach((_, i) => {
+                const dot = document.createElement('div');
+                dot.classList.add('nav-dot');
+                dot.dataset.index = i;
+                timelineNav.appendChild(dot);
+            });
+        }
+
+        function createStars() {
+            generateCosmicObjects(darkAgesStarfield, 80, 'star secondary-star', setupSecondaryStar);
+            generateCosmicObjects(document.querySelector('#first-galaxies .galaxy-stars'), 150, 'galaxy-star', setupGalaxyStar);
+            generateCosmicObjects(document.querySelector('#first-galaxies .distant-galaxies'), 40, 'mini-galaxy', setupMiniGalaxy);
+            generateCosmicObjects(document.querySelector('#solar-system .starfield'), 50, 'star secondary-star', (s) => setupSecondaryStar(s, true));
+            generateCosmicObjects(document.querySelector('#solar-system .galaxy-stars'), 100, 'disk-particle', setupDiskParticle);
+            generateCosmicObjects(document.querySelector('#modern-universe .galaxy-stars'), 400, 'galaxy-star', setupModernGalaxyStar);
+            generateCosmicObjects(document.querySelector('#modern-universe .distant-galaxies'), 60, 'mini-galaxy', setupMiniGalaxy);
+            generateCosmicObjects(conclusionStarfield, 150, 'star secondary-star', (s) => setupSecondaryStar(s, true));
+        }
+        
+        // --- Generadores de Objetos Cósmicos ---
+        function generateCosmicObjects(container, num, className, setupFn) { if (!container) return; for (let i = 0; i < num; i++) { const obj = document.createElement('div'); obj.className = className; if (setupFn) setupFn(obj); container.appendChild(obj); } }
+        function setupSecondaryStar(star, isVisible = false) { const size = Math.random() * 1.5 + 0.5; star.style.width = `${size}px`; star.style.height = `${size}px`; star.style.top = `${Math.random() * 100}%`; star.style.left = `${Math.random() * 100}%`; if(isVisible) star.style.opacity = `${Math.random() * 0.8 + 0.2}`; else star.dataset.delay = Math.random(); }
+        function setupGalaxyStar(star) { const size = Math.random() * 2 + 1; star.style.width = `${size}px`; star.style.height = `${size}px`; star.style.top = `${Math.random() * 100}%`; star.style.left = `${Math.random() * 100}%`; }
+        function setupMiniGalaxy(galaxy) { const size = Math.random() * 3 + 2; galaxy.style.width = `${size}px`; galaxy.style.height = `${size * (Math.random() * 0.3 + 0.7)}px`; galaxy.style.top = `${Math.random() * 100}%`; galaxy.style.left = `${Math.random() * 100}%`; galaxy.style.animationDuration = `${Math.random() * 150 + 100}s`; galaxy.style.animationDelay = `-${Math.random() * 250}s`; }
+        function setupDiskParticle(p) { const angle = Math.random() * Math.PI * 2; const radius = Math.random() * 40 + 10; p.style.top = `${50 + radius * Math.sin(angle)}%`; p.style.left = `${50 + radius * Math.cos(angle)}%`; p.style.animationDelay = `${Math.random() * 3}s`; }
+        function setupModernGalaxyStar(star) { const size = Math.random() * 2 + 0.5; star.style.width = `${size}px`; star.style.height = `${size}px`; const angle = Math.random() * Math.PI * 8; const radius = Math.pow(Math.random(), 1.5) * 50; star.style.top = `${50 + radius * Math.sin(angle + radius/10)}%`; star.style.left = `${50 + radius * Math.cos(angle + radius/10)}%`; }
+        
+        // --- Lógica de Audio con Tone.js ---
+        function initAudio() {
+            sounds = {
+                0: new Tone.AMSynth({ harmonicity: 1.2, oscillator: { type: 'sine' }, envelope: { attack: 4, decay: 1, sustain: 1, release: 4 }, modulation: { type: 'sine' } }).toDestination(),
+            };
+        }
+        let activeSound = null;
+
+        function playSound(index) {
+            if (!audioStarted || Object.keys(sounds).length === 0) return;
+
+            if (index !== 0 && activeSound) {
+                if (activeSound.triggerRelease) activeSound.triggerRelease();
+                activeSound = null;
+            } else if (index === 0) {
+                const sound = sounds[0];
+                if (activeSound !== sound) {
+                    activeSound = sound;
+                    activeSound.triggerAttack("A1");
+                }
+            }
+        }
+
+        // --- Manejadores de Eventos ---
+        function setupEventListeners() {
+            window.addEventListener('scroll', handleScroll);
+            timelineNav.addEventListener('click', handleNavClick);
+            arrowUp.addEventListener('click', () => navigate(-1));
+            arrowDown.addEventListener('click', () => navigate(1));
+            modalClose.addEventListener('click', () => modal.classList.remove('visible'));
+            document.querySelectorAll('.more-info-btn').forEach(btn => btn.addEventListener('click', openModal));
+            startBtn.addEventListener('click', startExperience);
+        }
+
+        function startExperience() {
+            Tone.start().then(() => {
+                audioStarted = true;
+                initAudio();
+                playSound(0);
+                loader.style.opacity = '0';
+                setTimeout(() => loader.style.display = 'none', 500);
+                document.querySelector('#big-bang .info-overlay').classList.add('visible');
+            });
+        }
+
+        function handleScroll() {
+            const scrollY = window.scrollY;
+            const viewportHeight = window.innerHeight;
+            currentSceneIndex = Math.floor(scrollY / viewportHeight);
+            const localProgress = (scrollY % viewportHeight) / viewportHeight;
+
+            updateScenes(localProgress);
+            updateNav();
+            handleSpecialAnimations(localProgress);
+        }
+
+        function navigate(direction) {
+            const newIndex = currentSceneIndex + direction;
+            if (newIndex >= 0 && newIndex < scenes.length) {
+                window.scrollTo({
+                    top: newIndex * window.innerHeight,
+                    behavior: 'smooth'
+                });
+            }
+        }
+        
+        function handleNavClick(e) {
+            if (e.target.classList.contains('nav-dot')) {
+                const index = parseInt(e.target.dataset.index);
+                window.scrollTo({ top: index * window.innerHeight, behavior: 'smooth' });
+            }
+        }
+
+        function openModal(e) {
+            const sceneIndex = parseInt(e.target.dataset.scene);
+            const data = modalData[sceneIndex];
+            if (data) {
+                modalTitle.textContent = data.title;
+                modalText.textContent = data.text;
+                modal.classList.add('visible');
+            }
+        }
+
+        // --- Lógica de Actualización de UI ---
+        function updateScenes(localProgress) {
+            scenes.forEach((scene, i) => {
+                let opacity = 0;
+                let isActive = false;
+                if (i === currentSceneIndex) {
+                    opacity = 1 - localProgress;
+                    isActive = true;
+                    if (scene.querySelector('.parallax-bg')) scene.querySelector('.parallax-bg').style.transform = `translateY(${localProgress * 20}vh)`;
+                } else if (i === currentSceneIndex + 1) {
+                    opacity = localProgress;
+                    isActive = true;
+                     if (scene.querySelector('.parallax-bg')) scene.querySelector('.parallax-bg').style.transform = `translateY(${(localProgress-1) * 20}vh)`;
+                }
+                scene.style.opacity = String(opacity);
+                scene.classList.toggle('active', isActive);
+            });
+            
+            infos.forEach((info, i) => {
+                if (!info) return;
+                let opacity = 0;
+                if (i === currentSceneIndex) {
+                    opacity = Math.max(0, 1 - localProgress * 2.5);
+                } else if (i === currentSceneIndex + 1) {
+                    opacity = Math.max(0, localProgress * 2.5 - 1.5);
+                }
+                info.style.opacity = String(opacity);
+            });
+        }
+
+        function updateNav() {
+            document.querySelectorAll('.nav-dot').forEach((dot, i) => {
+                dot.classList.toggle('active', i === currentSceneIndex);
+            });
+            arrowUp.classList.toggle('disabled', currentSceneIndex === 0);
+            arrowDown.classList.toggle('disabled', currentSceneIndex === scenes.length - 1);
+            playSound(currentSceneIndex);
+        }
+
+        function handleSpecialAnimations(localProgress) {
+            if (currentSceneIndex === 0) {
+                const scale = 1 + localProgress * 200;
+                lightPoint.style.transform = `scale(${scale})`;
+            }
+            
+            const darkAgesProgress = Math.max(0, Math.min(1, (window.scrollY - window.innerHeight * 2) / window.innerHeight));
+            darkAgesStarfield.querySelectorAll('.secondary-star').forEach(star => {
+                const delay = parseFloat(star.dataset.delay) || 0;
+                const starProgress = Math.max(0, (darkAgesProgress - 0.6 - (delay * 0.2)) / 0.2);
+                star.style.opacity = String(Math.min(1, starProgress));
+            });
+            const mainStarProgress = Math.max(0, (darkAgesProgress - 0.85) / 0.15);
+            firstStar.style.opacity = String(mainStarProgress);
+            firstStar.style.transform = `scale(${mainStarProgress * 1.5})`;
+
+            if (currentSceneIndex === 7 && Math.random() < 0.02) {
+                createShootingStar();
+            }
+        }
+
+        function createShootingStar() {
+            const star = document.createElement('div');
+            star.classList.add('shooting-star');
+            star.style.top = `${Math.random() * 100}%`;
+            star.style.left = `-${Math.random() * 100}%`;
+            star.style.animation = `tail ${Math.random() * 2 + 1}s ease-in-out infinite, shooting ${Math.random() * 2 + 1}s ease-in-out infinite`;
+            conclusionStarfield.appendChild(star);
+            setTimeout(() => {
+                star.remove();
+            }, 3000);
+        }
+
+        init();
+    });
+    </script>
+</body>
+</html>
